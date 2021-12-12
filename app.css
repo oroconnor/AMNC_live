@@ -1,0 +1,22 @@
+/* Owen O'Connor  - For AMNC Shiny dashboard*/
+
+body {
+}
+
+h2 {
+  text-align: center;
+  letter-spacing: 3px;
+  margin: 10px 10px 10px 10px;
+}
+
+h3 {
+  text-align: center;
+}
+
+a:hover {
+  opacity: 0.5;
+}
+
+.shiny-plot-output {
+  color: white;
+}
