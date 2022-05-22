@@ -20,3 +20,30 @@ a:hover {
 .shiny-plot-output {
   color: white;
 }
+
+.caution {
+  border:2px solid white;
+  padding:10px;
+}
+
+
+table {
+  border:2px solid white;
+  
+}
+
+th {
+  border:2px solid white;
+  padding:10px;
+}
+
+td {
+  border:2px solid white;
+  padding:10px;
+}
+
+.nav-tabs {
+  font-size: 18px
+  
+}
+

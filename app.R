@@ -1,4 +1,7 @@
-#AMNC homepage app
+# AMNC homepage app
+# Version 1.1.0
+# This dashboard was built by Owen O'Connor and Tributary Data LLC 
+# Questions? Email tributarydata@gmail.com
 
 library(shiny)
 library(shinythemes)
@@ -8,12 +11,10 @@ library(lubridate)
 library(tidyverse)
 library(openair)
 library(plotly)
+library(lattice)
 
 
-#library(nowcastr) can't get rsconnect to load this from github for the moment. Pasting the functions into
-#top of this app code for now. 
-
-### nowcast functions
+#### nowcast functions ----------------------------------------------------------------------------
 
 # hour_munge function
 
@@ -112,12 +113,12 @@ nowcast10 <- function (
 }
 
 
-### API Calls ----------------------------------------------------
+#### API Calls -------------------------------------------------------------------------
 
 ## QuantAQ API:
 
 api_key = 'C2TSVOC7S40ONPN6ZTXMLP0L'
-serial_number = 'MOD-PM-00044'
+serial_number = 'MOD-PM-00044' # Specific to this monitoring device
 
 base_url = "https://api.quant-aq.com/device-api/v1"
 accounts_endpoint = '/account'
@@ -240,7 +241,7 @@ webmasterk <- webmasterk %>%
 pm2p5avg <- nowcast(webmasterk)  #round(mean(webmasterk$PM2.5, na.rm = TRUE), digits = 2)
 pm10avg <- nowcast10(webmasterk) # round(mean(webmasterk$PM10,na.rm = TRUE), digits= 2)   
 
-## Onset Weather Station API:
+#### Onset Weather Station API: ----------------------------------------------------------------------------
 # authentication details 
 
 get_access_token <- function(client_id, client_secret){
@@ -328,12 +329,6 @@ token = get_access_token(client_id, client_secret)
 
 user_id = '11160'
 logger = '20989094'
-# start_date_time = '2021-10-20 00:00:00'
-# end_date_time = '2021-11-01 05:00:00'
-
-
-# data data by providing start date and end date
-#data = get_data_using_start_and_end_date(token, user_id, logger, start_date_time, end_date_time)
 
 hours = 1
 # get data of last x hours
@@ -342,13 +337,12 @@ wdata = get_last_hours_data(token, user_id, logger, hours)
 
 ### Weather Data Code ----------------------------------------------------
 
-#wdata <- read_csv("20989094_Apr2021_AMNC.csv")
-
 wdata <- wdata %>%
   mutate(
     timestamp = ymd_hms(timestamp)
   ) 
 
+# Here we are organizing the weather data into smaller dataframes that can be used easily by the plots
 wddata <- wdata %>%
   filter(
     sensor_measurement_type == "Wind Direction"
@@ -371,6 +365,30 @@ wsdata <- wdata %>%
     timestamp,ws
   )
 
+tempdata <- wdata %>%
+  filter(
+    sensor_measurement_type == "Temperature"
+  ) %>%
+  rename(
+    temp = si_value
+  ) %>%
+  select(
+    timestamp,temp
+  ) %>%
+  tail(1)
+
+rhdata <- wdata %>%
+  filter(
+    sensor_measurement_type == "RH"
+  ) %>%
+  rename(
+    rh = si_value
+  ) %>%
+  select(
+    timestamp,rh
+  ) %>%
+  tail(1)
+
 rose_df <- inner_join(wddata,wsdata, by = "timestamp") 
 
 
@@ -378,15 +396,28 @@ rose_df <- inner_join(wddata,wsdata, by = "timestamp")
 
 # Define UI for application
 ui <- fluidPage(
-    # Styling
+   # Styling
    theme = shinytheme("darkly"),
-  tags$head(includeCSS("app.css")),
+   tags$head(includeCSS("app.css"),
+            HTML(
+              # <!-- Global site tag (gtag.js) - Google Analytics -->
+                "<script async src='https://www.googletagmanager.com/gtag/js?id=G-E1XW5VZ9Z3'></script>
+                <script>
+                window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              
+              gtag('config', 'G-E1XW5VZ9Z3');
+              </script>"
+            )
+            
+            ),
   
     # Application title
-   # titlePanel("Kingston NY Particulate Matter"),
+    # titlePanel("Kingston NY Air Quality"),
 
-  titlePanel( div(column(width = 4, tags$a(href="https://landairwater.bard.edu/projects/kaqi/", tags$img(src = "bcslaw-logo.png", height = 50, width = 400))),
-                column(width = 8, h2("Kingston NY Particulate Matter"))
+    titlePanel( div(column(width = 4, tags$a(href="https://landairwater.bard.edu/projects/kaqi/", tags$img(src = "bcesh_logo.png", height = 50, width = 400))),
+                column(width = 8, h2("Kingston NY Air Quality"))
                   ),
               windowTitle="Kingston Particulate Matter"
   ),
@@ -395,14 +426,59 @@ ui <- fluidPage(
   
     sidebarLayout(
       sidebarPanel(
-        helpText("The Bard Center for the Study of Land, Air, and Water maintains
-               a QuantAQ Air Quality Monitor on top of the Andy Murphy Neighborhood Center
-               in Kingston, NY. Here you can see the most recent Particulate Matter data from this sensor. ",tags$br(),tags$br(),
+        helpText("The Bard College Center for Environmental Sciences and Humanities maintains
+               an air quality monitoring station on top of the Andy Murphy Neighborhood Center
+               at 467 Broadway in Kingston, NY. Here you can see the most recent Particulate Matter data from this sensor. ",tags$br(),tags$br(),
                  "You can learn more information about the monitoring program ",
                  tags$a(href="https://landairwater.bard.edu/projects/kaqi/", "here."),
         tags$br(),tags$br(),
         "You can explore historic data from Kingston ",
-        tags$a(href="https://tributary.shinyapps.io/AMNCexplorer/", "here."))
+        tags$a(href="https://tributary.shinyapps.io/AMNCexplorer/", "here.")),
+        tags$br(),tags$br(),
+        HTML("
+          <h3>US EPA Air Quality Interpretation</h2>
+            
+            <table>
+            <tr>
+            <th>Air Quality</th>
+            <th>PM2.5 Concentration</th>
+            <th>Caution Notes</th>
+            </tr>
+            <tr style=color:black;background-color:rgb(0,228,0)>
+            <td>Good</td>
+            <td>0-12.0</td>
+            <td>None</td>
+            </tr>
+            <tr style=color:black;background-color:rgb(255,255,0)>
+            <td>Moderate</td>
+            <td>12.1-35.4</td>
+            <td>Unusually sensitive people should consider reducing prolonged or heavy exertion.</td>
+            </tr>
+            <tr style=color:black;background-color:rgb(255,126,0)>
+            <td>Unhealthy for Sensitive Groups</td>
+            <td>35.5-55.4</td>
+            <td>People with heart or lung disease, older adults, children, and people of lower socioeconomic status should reduce prolonged or heavy exertion.</td>
+            </tr>
+            <tr style=color:black;background-color:rgb(255,0,0)>
+            <td>Unhealthy</td>
+            <td>55.5-150.4</td>
+            <td>People with heart or lung disease, older adults, children, and people of lower socioeconomic status should avoid prolonged or heavy exertion; everyone else should reduce prolonged or heavy exertion.</td>
+            </tr>
+            <tr style=background-color:rgb(143,63,151)>
+            <td>Very Unhealthy</td>
+            <td>150.5-250.4</td>
+            <td>People with heart or lung disease, older adults, children, and people of lower socioeconomic status should avoid all physical activity outdoors. Everyone else should avoid prolonged or heavy exertion.</td>
+            </tr>
+            <tr style=background-color:rgb(126,0,35)>
+            <td>Hazardous</td>
+            <td>250.5-500.4</td>
+            <td>Everyone should avoid all physical activity outdoors; people with heart or lung disease, older adults, children, and people of lower socioeconomic status should remain indoors and keep activity levels low.</td>
+            </tr>
+            </table>
+            "
+        ), # end HTML
+        tags$br(),tags$br(),
+        tags$img(src = "AMNC_location1.png", width = "100%")
       ),
     mainPanel(
       tabsetPanel(type = "tabs",
@@ -410,15 +486,17 @@ ui <- fluidPage(
                       
         fluidRow(
           column(6,
-                plotOutput("plot1"),
-                h3(textOutput("pm2p5avg")),
-                textOutput("pm2p5_caution"),
+                plotOutput("plot1", height = "275px"),
+                htmlOutput("pm2p5avg"),
+                textOutput("pm2p5_caution")%>% 
+                  tagAppendAttributes(class = 'caution'),
                # plotOutput("plot3") # windrose
           ),
          column(6,
-                plotOutput("plot2"),
-                h3(textOutput("pm10avg")),
-                textOutput("pm10_caution"),
+                plotOutput("plot2", height = "275px"),
+                htmlOutput("pm10avg"),
+                textOutput("pm10_caution")%>% 
+                  tagAppendAttributes(class = 'caution'),
                # plotlyOutput("plot4") # windspeed
          )
         ), # End first fluidRow
@@ -436,14 +514,29 @@ ui <- fluidPage(
           column(6,
                  plotlyOutput("plot4") # windspeed
           )
-          ) # End second fluidRow
+          ), # End second fluidRow
         
+        br(),
+        fluidRow(
+        column(6,
+               plotlyOutput("ftemp_plot") # temperature
+        ),
+        column(6,
+               plotlyOutput("plot6") # RH
+        )
+        ) # End third fluidRow
         
         ), # End Tabpanel 1
         
         tabPanel("Past 12 Hours",
                  plotOutput("pm2.5Plot"),
-                 verbatimTextOutput("summary")
+                 verbatimTextOutput("summary"),
+                 checkboxGroupInput("variable", "Observations to display:",
+                                    c("PM2.5" = "PM2.5",
+                                      "PM10" = "PM10"
+                                    ),
+                                    selected = "PM2.5"
+                 )
   
                  
         ) # End Tabpanel 2
@@ -453,6 +546,15 @@ ui <- fluidPage(
         
         ) # End mainPanel
     ) # End sidebarLayout
+  ,
+  # FOOTER 
+  hr(),
+  print("References:"), br(),
+  print("Particulate Matter monitor:"), tags$a(href= "https://assets.quant-aq.com/downloads/spec-sheets/modulair-pm.latest.pdf", "QuantAQ Modulair"), br(),
+  print("Weather Station:"), tags$a(href= "https://www.onsetcomp.com/datasheet/RX2100", "OnsetRX2100"), br(),
+  print("This dashboards PM concentrations and warnings are based off of the EPA's Nowcast calculation method."), br(),
+  print("More info on NowCast Reporting:"), tags$a(href= "https://www.airnow.gov/sites/default/files/2020-05/aqi-technical-assistance-document-sept2018.pdf", "Technical Assistance Document for the Reporting of Daily Air Quality ")
+  
     ) # End fluidPage
 
 
@@ -460,27 +562,38 @@ ui <- fluidPage(
 server <- function(input, output) {
   thematic::thematic_shiny()
   
+  # Subsets dataset based on variable selections for 12-hour plot
+  halfday_df <-  reactive({
+    webmasterk %>%
+      select(
+        time,
+        c(input$variable)
+      ) })
+  
+  
   # Plots ---------------------------------------------
     output$plot1 <- renderPlot({
+      par(mar=c(1,4.1, 4.1, 2.1))
        barplot(
          rep(1,1),
-         main = "PM2.5 - Fine Particles",
+         main = "PM2.5 - Fine Particles", cex.main=1.5,
          col = color1,
          space = 0,
          axes = FALSE
-       )
-      text(.5,.5,pm2p5_category, cex = 3)
+       ) 
+      text(.5,.5,pm2p5_category, col = "black", cex = 3)
     })
     
     output$plot2 <- renderPlot({
+      par(mar=c(1,4.1, 4.1, 2.1))
       barplot(
         rep(1,1),
-        main = "PM10 - Coarse Particles",
+        main = "PM10 - Coarse Particles", cex.main=1.5,
         col = color2,
         space = 0,
         axes = FALSE
       )
-      text(.5,.5,pm10_category, cex = 3)
+      text(.5,.5,pm10_category, col = "black", cex = 3)
     })
     
     # windrose
@@ -488,7 +601,8 @@ server <- function(input, output) {
       validate(
         need(FALSE, "No wind currently... Check back later. ")
       )
-      windRose(rose_df, paddle = FALSE, main = "Wind Direction - past hour"
+      
+      windRose(rose_df, paddle = FALSE, main = "Wind Direction - past hour", key.footer = expression("(m/s)"),  par.settings = list(axis.text = list(col = "white"), par.main.text = list(col = "white", fontsize=18),add.text = list(col = "white"), par.sub.text = list(col = "white",fontsize=14), fontsize=list(text=20))
       )
     })
     
@@ -511,26 +625,95 @@ server <- function(input, output) {
                )
     })
     
+    # C temperature gauge
+    output$plot5 <- renderPlotly({ 
+      plot_ly(
+        domain = list(x = c(0, 1), y = c(0, 1)),
+        value = tempdata$temp,
+        title = list(text = "Temperature, deg. C"),
+        type = "indicator",
+        mode = "gauge+number",
+        gauge = list(
+          axis =list(range = list(-25, 45))
+        ) 
+      ) %>%
+        layout(margin = list(l=20,r=30),
+               paper_bgcolor='rgba(0,0,0,0)',
+               plot_bgcolor='rgba(0,0,0,0)',
+               font = list(color = '#ff0000')
+        )
+    })
+    
+    # F temperature gauge
+    output$ftemp_plot <- renderPlotly({ 
+      plot_ly(
+        domain = list(x = c(0, 1), y = c(0, 1)),
+        value = (tempdata$temp * (9/5)) + 32,
+        title = list(text = "Temperature, deg. F"),
+        type = "indicator",
+        mode = "gauge+number",
+        gauge = list(
+          axis =list(range = list(-15, 110))
+        ) 
+      ) %>%
+        layout(margin = list(l=20,r=30),
+               paper_bgcolor='rgba(0,0,0,0)',
+               plot_bgcolor='rgba(0,0,0,0)',
+               font = list(color = '#ff0000')
+        )
+    })
+    
+    # RH gauge
+    output$plot6 <- renderPlotly({ 
+      plot_ly(
+        domain = list(x = c(0, 1), y = c(0, 1)),
+        value = rhdata$rh,
+        title = list(text = "Relative Humidity, %"),
+        type = "indicator",
+        mode = "gauge+number",
+        gauge = list(
+          axis =list(range = list(0, 100))
+        ) 
+      ) %>%
+        layout(margin = list(l=20,r=30),
+               paper_bgcolor='rgba(0,0,0,0)',
+               plot_bgcolor='rgba(0,0,0,0)',
+               font = list(color = '#fcf403')
+        )
+    })
+    
 
     
     output$pm2.5Plot <- renderPlot({
+      # Displays gentle error message if no variables are selected in checkbox
+      shiny::validate(
+         need(input$variable != "", "Please select at least one variable to display")
+        )
       
       # Time series point chart displaying data that user selects
-      webmasterk %>%
-        #pivot_longer(starts_with("PM"), names_to = "Pollutant Class", values_to = "observation") %>%
-        ggplot(aes(x = time, y = PM2.5)) +
-        geom_point(color = "red") +
+      halfday_df() %>%
+        pivot_longer(starts_with("PM"), names_to = "Pollutant Class", values_to = "observation") %>%
+        ggplot(aes(x = time, y = observation, color = `Pollutant Class`) ) +
+        geom_point() +
+        scale_color_manual(values = c("PM2.5" = "darkorange1",
+                                      "PM10"="dodger blue"
+                                        )) +
         scale_x_datetime(minor_breaks = NULL, date_breaks = "30 min", date_labels = "%b%e %l:%M %p") +
         labs(
           y = expression(Mass - (μg/~m^3)),
           x = NULL,
           title = paste(
-            "Most Recent PM2.5 Readings"
+            "Most Recent Particulate Matter Readings"
           ) ) +
         theme_classic() +
         theme(plot.title = element_text(hjust = 0.5) ) +
-        theme(axis.text.x=element_text(angle=60, hjust=1)) +
-        theme(plot.subtitle = element_text(hjust = 0.5) )
+        theme(plot.title = element_text(size = 18)) +
+        theme(plot.subtitle = element_text(hjust = 0.5) ) +
+        theme(axis.text.x = element_text(angle=60, hjust=1) ) +
+        theme(axis.text = element_text(size = 11)) +
+        theme(axis.title = element_text(size = 13)) +
+        theme(legend.text = element_text(size = 11))     
+         
     }) # End of renderPlot
     
     
@@ -540,17 +723,17 @@ server <- function(input, output) {
         select(
           -time
         )
-      summary(dataset)
-    })
+      summary(dataset )
+              })
     
-    mass_express <- expression(μg / ~ m^3)
-      
-    output$pm2p5avg <- renderText({
-      paste("Current PM2.5:", pm2p5avg, mass_express, sep = "     ")
+    #mass_express <- "μg / m ^ 3"
+    
+    output$pm2p5avg <- renderUI({
+      HTML(paste("<h3>Current PM2.5:", pm2p5avg, "μg / m <sup>3</sup></h3>"))
     })
     
     output$pm10avg <- renderText({
-      paste("Current PM10:", pm10avg, mass_express, sep = "     ")
+      HTML(paste("<h3>Current PM2.5:", pm10avg, "μg / m <sup>3</sup></h3>"))
     })
 
     
@@ -580,39 +763,39 @@ server <- function(input, output) {
       pm2p5_caution = "People with heart or lung disease, older adults, children, and people of lower socioeconomic status should avoid all physical activity outdoors. Everyone else should avoid prolonged or heavy exertion."
       color1 = rgb(143, 63, 151, max=255)
     }    
-    else if (pm2p5avg < 500.5) {
+    else if (pm2p5avg >= 250.5) {
       pm2p5_category = "Hazardous"
       pm2p5_caution = "Everyone should avoid all physical activity outdoors; people with heart or lung disease, older adults, children, and people of lower socioeconomic status should remain indoors and keep activity levels low."
       color1 = rgb(126, 0, 35, max=255)
     }    
 
 # Set Categories and Cautionary Statements based on PM10 concentrations        
-    if (pm10avg < 12.1) {
+    if (pm10avg < 55) {
       pm10_category = "Good"
       pm10_caution = "None"
       color2 = rgb(0, 228, 0, max=255)
     }
-    else if (pm10avg < 35.5) {
+    else if (pm10avg < 155) {
       pm10_category = "Moderate"
       pm10_caution = "Unusually sensitive people should consider reducing prolonged or heavy exertion."
       color2 = rgb(255, 255, 0, max=255)
     }   
-    else if (pm10avg < 55.5) {
+    else if (pm10avg < 255) {
       pm10_category = "Unhealthy for Sensitive Groups"
       pm10_caution = "People with heart or lung disease, older adults, children, and people of lower socioeconomic status should reduce prolonged or heavy exertion."
       color2 = rgb(255, 126, 0, max=255)
     }
-    else if (pm10avg < 150.5) {
+    else if (pm10avg < 355) {
       pm10_category = "Unhealthy"
       pm10_caution = "People with heart or lung disease, older adults, children, and people of lower socioeconomic status should avoid prolonged or heavy exertion; everyone else should reduce prolonged or heavy exertion."
       color2 = rgb(255, 0, 0, max=255)
     }    
-    else if (pm10avg < 250.5) {
+    else if (pm10avg < 425) {
       pm10_category = "Very Unhealthy"
       pm2p5_caution = "People with heart or lung disease, older adults, children, and people of lower socioeconomic status should avoid all physical activity outdoors. Everyone else should avoid prolonged or heavy exertion."
       color2 = rgb(143, 63, 151, max=255)
     }    
-    else if (pm10avg < 500.5) {
+    else if (pm10avg >= 425) {
       pm10_category = "Hazardous"
       pm10_caution = "Everyone should avoid all physical activity outdoors; people with heart or lung disease, older adults, children, and people of lower socioeconomic status should remain indoors and keep activity levels low."
       color2 = rgb(126, 0, 35, max=255)
